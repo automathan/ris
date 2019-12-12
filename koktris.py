@@ -2,12 +2,22 @@ import numpy as np
 import pygame as pg
 from pathlib import Path
 import random
+import torch.nn as nn
+import torch
+from vicero.algorithms.reinforce import Reinforce
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
-
+"""
 piece_types = [
     [[0,0,0,0],
      [0,0,1,0],
      [1,1,1,0],
+     [0,0,0,0]],
+
+    [[0,0,0,0],
+     [0,1,0,0],
+     [0,1,1,1],
      [0,0,0,0]],
 
     [[0,1,0,0],
@@ -23,29 +33,68 @@ piece_types = [
     [[0,0,0,0],
      [1,1,0,0],
      [0,1,1,0],
+     [0,0,0,0]],
+
+    [[0,0,0,0],
+     [0,1,1,0],
+     [1,1,0,0],
+     [0,0,0,0]],
+
+    [[0,0,0,0],
+     [0,1,1,0],
+     [0,1,1,0],
      [0,0,0,0]]
 ]
+"""
+
+piece_types = [
+    [[0,0,0,0],
+     [0,0,0,0],
+     [0,1,0,0],
+     [0,0,0,0]]
+]
+
 
 class Koktris:
     NOP, LEFT, RIGHT, DOWN, ROT = range(5)
 
-    def __init__(self, scale):
-        board = np.zeros((16, 8))
+    def __init__(self, scale, width=8, height=16):
+        board = np.zeros((height, width))
+        self.width = width
+        self.height = height
+        
+        self.time = 0
+        self.cutoff = 20000
 
         self.board = np.array(board)
         self.size = len(board)
         self.cell_size = scale
-        self.falling_piece_pos = (2, 0)
+        self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
         self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
         self.subframe = 0
-        self.subframes = 8
+        self.subframes = 5
+        self.screen = None
     
     def reset(self):
-        board = np.zeros((16, 8))
+        board = np.zeros((self.height, self.width))
         self.board = np.array(board)
-        self.falling_piece_pos = (2, 0)
+        self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
         self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
         self.subframe = 0
+
+        piece = np.array(np.zeros((self.height, self.width)))
+        for i in range(4):
+            for j in range(4):
+                if self.falling_piece_shape[j][i] == 1:
+                    pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
+                    piece[pos[1]][pos[0]] = 1
+        self.time = 0     
+        state = np.array([[
+            self.board,
+            piece
+        ]])
+
+        return state
         
     def resolve_lines(self):
         removed = 0
@@ -58,8 +107,10 @@ class Koktris:
         return removed
         
     def step(self, action):
+        self.time = self.time + 1
         self.subframe = self.subframe + 1
         done = False
+        reward = 0
 
         if action == Koktris.LEFT:
             coll = False
@@ -108,23 +159,51 @@ class Koktris:
                         if pos_below[1] >= len(self.board) or self.board[pos_below[1]][pos_below[0]] != 0:
                             coll = True
             if coll:
+                bottom = False
                 for i in range(4):
                     for j in range(4):
                         if self.falling_piece_shape[j][i] == 1:
                             pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
                             self.board[pos[1]][pos[0]] = 1
-                
-                self.resolve_lines()
+                            if pos[1] > (len(self.board) // 2):
+                                bottom = True
 
+                #if bottom:
+                #    reward = 1
+                #else:
+                #    reward = -.1
+                
+                points = self.resolve_lines()
+                if points > 0:
+                    reward = (2 + points) ** 2
+                    
                 if self.falling_piece_pos[1] == 0:
                     done = True
-                self.falling_piece_pos = (np.random.randint(0, 6), 0)
+                    reward = -1
+
+                self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
                 self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
             
             else:
                 self.falling_piece_pos = (self.falling_piece_pos[0], self.falling_piece_pos[1] + 1)
 
-        return done
+        piece = np.array(np.zeros((self.height, self.width)))
+        for i in range(4):
+            for j in range(4):
+                if self.falling_piece_shape[j][i] == 1:
+                    pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
+                    piece[pos[1]][pos[0]] = 1
+                
+              
+        state = np.array([[
+            self.board,
+            piece
+        ]])
+
+        if self.time > self.cutoff:
+            done = True
+
+        return state, reward, done, {}
     
 
     def draw(self, screen, heatmap=None):
@@ -136,8 +215,8 @@ class Koktris:
                 cell = pg.Rect(self.cell_size * i, self.cell_size * j, self.cell_size, self.cell_size)
                 
                 if self.board[j][i] == 1: 
-                    pg.draw.rect(screen, (0, 80, 0), cell)
-                    pg.draw.rect(screen, (0, 70, 0), cell, 1)
+                    pg.draw.rect(screen, (0, 100, 0), cell)
+                    pg.draw.rect(screen, (0, 90, 0), cell, 1)
                 else:
                     pg.draw.rect(screen, (64, 64, 64), cell)
                     pg.draw.rect(screen, (58, 58, 58), cell, 1)
@@ -148,18 +227,62 @@ class Koktris:
             for j in range(4):
                 cell = pg.Rect(self.cell_size * (i + self.falling_piece_pos[0]), self.cell_size * (j + self.falling_piece_pos[1]), self.cell_size, self.cell_size)
                 if self.falling_piece_shape[j][i] == 1: 
-                    pg.draw.rect(screen, (0, 100, 0), cell)
-                    pg.draw.rect(screen, (0, 90, 0), cell, 1)
-        
+                    pg.draw.rect(screen, (0, 120, 0), cell)
+                    pg.draw.rect(screen, (0, 110, 0), cell, 1)
+    
+    def render(self, mode=''):
+        self.draw(self.screen)    
+        pg.display.flip()
 
-cell_size  = 48
+cell_size  = 32
 framerate  = 32
 
-env = Koktris(cell_size)
+def plot(history):
+        plt.figure(2)
+        plt.clf()
+        durations_t = torch.FloatTensor(history)
+        plt.title('Training...')
+        plt.xlabel('Episode')
+        plt.ylabel('Duration')
+        plt.plot(durations_t.numpy())
+
+        if len(durations_t) >= 50:
+            means = durations_t.unfold(0, 50, 1).mean(1).view(-1)
+            means = torch.cat((torch.zeros(49), means))
+            plt.plot(means.numpy())
+            
+        plt.pause(0.001)
+
+env = Koktris(cell_size, height=9, width=5)
 
 pg.init()
 clock = pg.time.Clock()
 screen = pg.display.set_mode((cell_size * len(env.board[0]), cell_size * len(env.board)))
+
+env.screen = screen
+
+class PolicyNet(nn.Module):
+    def __init__(self):
+        super(PolicyNet, self).__init__()
+        self.conv = nn.Conv2d(2, 12, 3)
+        self.conv2 = nn.Conv2d(12, 6, 3)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(30, 32)
+        self.fc2 = nn.Linear(32, 16)
+        self.fc3 = nn.Linear(16, 5)
+
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        #x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = torch.sigmoid(self.fc3(x))
+        return x
+
+poligrad = Reinforce(env, polinet=PolicyNet(), learning_rate=0.05, gamma=0.98, batch_size=2, plotter=plot)
+poligrad.train(10000)
 
 while True:
     env.draw(screen)
@@ -174,7 +297,7 @@ while True:
                 action = Koktris.RIGHT
             if event.key == pg.K_UP:
                 action = Koktris.ROT
-    
-    done = env.step(action)
+    state, reward, done, _ = env.step(action)
+
     if done: env.reset()
     clock.tick(int(framerate))
