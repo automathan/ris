@@ -5,10 +5,11 @@ import random
 import torch.nn as nn
 import torch
 from vicero.algorithms.reinforce import Reinforce
+from vicero.algorithms.deepqlearning import DQN
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-
+"""
 piece_types = [
     [[0,0,0,0],
      [0,0,1,0],
@@ -45,15 +46,15 @@ piece_types = [
      [0,1,1,0],
      [0,0,0,0]]
 ]
-
 """
+
 piece_types = [
     [[0,0,0,0],
      [0,0,0,0],
-     [0,1,0,0],
+     [0,1,1,0],
      [0,0,0,0]]
 ]
-"""
+
 """
 piece_types = [
     [[0,0,0,0],
@@ -95,6 +96,10 @@ class Koktris:
     NOP, LEFT, RIGHT, DOWN, ROT = range(5)
 
     def __init__(self, scale, width=8, height=16):
+        class ActionSpace:
+            def __init__(self):
+                self.n = 5
+        self.action_space = ActionSpace()
         board = np.zeros((height, width))
         self.width = width
         self.height = height
@@ -203,7 +208,8 @@ class Koktris:
                             self.board[pos[1]][pos[0]] = 1
                             if pos[1] > (len(self.board) // 2):
                                 bottom = True
-
+                
+                #reward = 1
                 #if bottom:
                 #    reward = 1
                 #else:
@@ -276,20 +282,21 @@ framerate  = 32
 def plot(history):
         plt.figure(2)
         plt.clf()
-        durations_t = torch.FloatTensor(history)
+        durations_t = torch.DoubleTensor(history)
         plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Duration')
         plt.plot(durations_t.numpy(), c='lightgray', linewidth=1)
 
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-            means = torch.cat((torch.zeros(99), means))
+        his = 100
+        if len(durations_t) >= his:
+            means = durations_t.unfold(0, his, 1).mean(1).view(-1)
+            means = torch.cat((torch.zeros(his - 1), means))
             plt.plot(means.numpy(), c='green')
             
         plt.pause(0.001)
 
-env = Koktris(cell_size, height=22, width=9)
+env = Koktris(cell_size, height=14, width=7)
 
 pg.init()
 clock = pg.time.Clock()
@@ -303,7 +310,7 @@ class PolicyNet(nn.Module):
         self.conv = nn.Conv2d(2, 12, 3)
         self.conv2 = nn.Conv2d(12, 6, 3)
         self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(540, 32)
+        self.fc1 = nn.Linear(180, 32)
         self.fc2 = nn.Linear(32, 16)
         self.fc3 = nn.Linear(16, 5)
 
@@ -314,13 +321,17 @@ class PolicyNet(nn.Module):
         x = torch.flatten(x)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
+        x = self.fc3(x)
+        #x = torch.sigmoid(self.fc3(x))
         return x
 
-poligrad = Reinforce(env, polinet=PolicyNet(), learning_rate=0.01, gamma=0.95, batch_size=5, plotter=plot)
-poligrad.train(10000)
+dqn = DQN(env, qnet=PolicyNet().double(), plotter=plot, render=True)
+dqn.train(1000, 1, plot=True, verbose=True)
 
-while True:
+#poligrad = Reinforce(env, polinet=PolicyNet(), learning_rate=0.01, gamma=0.95, batch_size=5, plotter=plot)
+#poligrad.train(10000)
+
+while False:
     env.draw(screen)
     pg.display.flip()
     action = Koktris.NOP
