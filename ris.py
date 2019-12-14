@@ -8,7 +8,7 @@ piece_types = [
      [0,0,0,0]]
 ]
 
-class Koktris:
+class Ris:
     NOP, LEFT, RIGHT, DOWN, ROT = range(5)
 
     def __init__(self, scale, width=8, height=16):
@@ -69,7 +69,7 @@ class Koktris:
         done = False
         reward = 0
 
-        if action == Koktris.LEFT:
+        if action == Ris.LEFT:
             coll = False
             for i in range(4):
                 for j in range(4):
@@ -80,7 +80,7 @@ class Koktris:
             if not coll:
                 self.falling_piece_pos = (self.falling_piece_pos[0] - 1, self.falling_piece_pos[1])
         
-        if action == Koktris.RIGHT:
+        if action == Ris.RIGHT:
             coll = False
             for i in range(4):
                 for j in range(4):
@@ -91,7 +91,7 @@ class Koktris:
             if not coll:
                 self.falling_piece_pos = (self.falling_piece_pos[0] + 1, self.falling_piece_pos[1])
             
-        if action == Koktris.ROT:
+        if action == Ris.ROT:
             rotated = np.rot90(self.falling_piece_shape)
             coll = False
             for i in range(4):
@@ -192,3 +192,22 @@ class Koktris:
         self.draw(self.screen)    
         pg.display.flip()
 
+    def play(self, framerate=30):
+        clock = pg.time.Clock()
+        while True:
+            self.render()
+
+            action = Ris.NOP
+            events = pg.event.get()
+            for event in events:
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_LEFT:
+                        action = Ris.LEFT
+                    if event.key == pg.K_RIGHT:
+                        action = Ris.RIGHT
+                    if event.key == pg.K_UP:
+                        action = Ris.ROT
+            state, reward, done, _ = self.step(action)
+
+            if done: self.reset()
+            clock.tick(int(framerate))

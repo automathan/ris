@@ -7,10 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from vicero.algorithms.deepqlearning import DQN
-from ris import Koktris
+from ris import Ris
 
 cell_size  = 32
-framerate  = 32
+env = Ris(cell_size, height=14, width=7)
 
 def plot(history):
         plt.figure(2)
@@ -29,12 +29,8 @@ def plot(history):
             
         plt.pause(0.001)
 
-env = Koktris(cell_size, height=14, width=7)
-
 pg.init()
-clock = pg.time.Clock()
 screen = pg.display.set_mode((cell_size * len(env.board[0]), cell_size * len(env.board)))
-
 env.screen = screen
 
 class PolicyNet(nn.Module):
@@ -60,24 +56,3 @@ class PolicyNet(nn.Module):
 
 dqn = DQN(env, qnet=PolicyNet().double(), plotter=plot, render=True, memory_length=20000, )
 dqn.train(1000, 8, plot=True, verbose=True)
-
-#poligrad = Reinforce(env, polinet=PolicyNet(), learning_rate=0.01, gamma=0.95, batch_size=5, plotter=plot)
-#poligrad.train(10000)
-
-while False:
-    env.draw(screen)
-    pg.display.flip()
-    action = Koktris.NOP
-    events = pg.event.get()
-    for event in events:
-        if event.type == pg.KEYDOWN:
-            if event.key == pg.K_LEFT:
-                action = Koktris.LEFT
-            if event.key == pg.K_RIGHT:
-                action = Koktris.RIGHT
-            if event.key == pg.K_UP:
-                action = Koktris.ROT
-    state, reward, done, _ = env.step(action)
-
-    if done: env.reset()
-    clock.tick(int(framerate))
