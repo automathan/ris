@@ -45,10 +45,15 @@ class Ris:
                 if self.falling_piece_shape[j][i] == 1:
                     pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
                     piece[pos[1]][pos[0]] = 1
-        self.time = 0     
+        self.time = 0
+
+        
+        timing_layer = np.zeros((self.height, self.width))
+        
         state = np.array([[
             self.board,
-            piece
+            piece,
+            timing_layer
         ]])
 
         return state
@@ -138,10 +143,13 @@ class Ris:
                 if self.falling_piece_pos[1] == 0:
                     done = True
                     reward = -1
+                
+                #self.falling_piece_pos = (np.random.randint(0, 2), 0)
+                #self.falling_piece_shape = piece_types[0]
 
                 self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
-                self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
-            
+                self.falling_piece_shape = np.rot90(piece_types[np.random.randint(0, len(piece_types))], k=np.random.randint(0, 4))
+
             else:
                 self.falling_piece_pos = (self.falling_piece_pos[0], self.falling_piece_pos[1] + 1)
 
@@ -151,11 +159,15 @@ class Ris:
                 if self.falling_piece_shape[j][i] == 1:
                     pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
                     piece[pos[1]][pos[0]] = 1
-                
-              
+        
+        timing_layer = np.zeros((self.height, self.width))
+        if self.subframe == self.subframes - 2:
+            timing_layer = np.ones((self.height, self.width))
+
         state = np.array([[
             self.board,
-            piece
+            piece,
+            timing_layer
         ]])
 
         if self.time > self.cutoff:
