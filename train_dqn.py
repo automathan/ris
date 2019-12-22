@@ -32,16 +32,16 @@ def plot(history):
 pg.init()
 screen = pg.display.set_mode((cell_size * len(env.board[0]), cell_size * len(env.board)))
 env.screen = screen
-
+"""
 class PolicyNet(nn.Module):
     def __init__(self):
         super(PolicyNet, self).__init__()
-        self.conv = nn.Conv2d(3, 32, 3)
-        self.conv2 = nn.Conv2d(32, 16, 3)
+        self.conv = nn.Conv2d(3, 8, 3, padding=1)
+        self.conv2 = nn.Conv2d(8, 4, 3)
         self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(96, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, 5)
+        self.fc1 = nn.Linear(96, 24)
+        self.fc2 = nn.Linear(24, 10)
+        self.fc3 = nn.Linear(10, 5)
 
     def forward(self, x):
         x = F.relu(self.conv(x))
@@ -50,9 +50,35 @@ class PolicyNet(nn.Module):
         x = torch.flatten(x)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.sigmoid(self.fc3(x))
+        return x
+"""
+
+class PolicyNet(nn.Module):
+    def __init__(self):
+        super(PolicyNet, self).__init__()
+        
+        self.conv = nn.Conv2d(3, 64, 3, padding=1)
+        self.conv2 = nn.Conv2d(64, 32, 3)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(768, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, 32)
+        self.fc4 = nn.Linear(32, 5)
+        
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        #x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
+        #x = self.fc3(x)
         #x = torch.sigmoid(self.fc3(x))
         return x
 
-dqn = DQN(env, qnet=PolicyNet().double(), plotter=plot, render=True, memory_length=20000, )
-dqn.train(1000, 4, plot=True, verbose=True)
+
+dqn = DQN(env, qnet=PolicyNet().double(), plotter=plot, render=True, memory_length=20000, gamma=.92, alpha=.0001, epsilon_start=0.5)
+dqn.train(3000, 4, plot=True, verbose=True)

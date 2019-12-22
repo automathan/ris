@@ -142,7 +142,7 @@ class Ris:
                     
                 if self.falling_piece_pos[1] == 0:
                     done = True
-                    reward = -1
+                    reward = -10
                 
                 #self.falling_piece_pos = (np.random.randint(0, 2), 0)
                 #self.falling_piece_shape = piece_types[0]

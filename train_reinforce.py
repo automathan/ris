@@ -35,6 +35,27 @@ env.screen = screen
 class PolicyNet(nn.Module):
     def __init__(self):
         super(PolicyNet, self).__init__()
+        self.conv = nn.Conv2d(3, 8, 3, padding=1)
+        self.conv2 = nn.Conv2d(8, 4, 3)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(96, 24)
+        self.fc2 = nn.Linear(24, 10)
+        self.fc3 = nn.Linear(10, 5)
+
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        #x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = torch.sigmoid(self.fc3(x))
+        return x
+
+"""
+class PolicyNet(nn.Module):
+    def __init__(self):
+        super(PolicyNet, self).__init__()
         self.conv = nn.Conv2d(3, 16, 3, padding=1)
         self.conv2 = nn.Conv2d(16, 8, 3)
         self.pool = nn.MaxPool2d(2, 2)
@@ -51,6 +72,7 @@ class PolicyNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = torch.sigmoid(self.fc3(x))
         return x
+"""
 
 poligrad = Reinforce(env, polinet=PolicyNet(), learning_rate=0.004, gamma=0.98, batch_size=5, plotter=plot)
 poligrad.train(10000)
