@@ -1,33 +1,25 @@
 import numpy as np
 import pygame as pg
+import gym
+from gym import spaces
 
-piece_types = [
-    [[0,0,0,0],
-     [0,0,0,0],
-     [0,1,1,0],
-     [0,0,0,0]]
-]
-
-class Ris:
+class Ris(gym.Env):
     NOP, LEFT, RIGHT, DOWN, ROT = range(5)
 
-    def __init__(self, scale, width=8, height=16):
-        class ActionSpace:
-            def __init__(self):
-                self.n = 5
-        self.action_space = ActionSpace()
+    def __init__(self, scale, width=8, height=16, piece_set='lettris'):
+        self.action_space = spaces.Discrete(5)
         board = np.zeros((height, width))
         self.width = width
         self.height = height
-        
         self.time = 0
         self.cutoff = 4000
 
         self.board = np.array(board)
         self.size = len(board)
         self.cell_size = scale
+        self.piece_types = Ris.piece_sets[piece_set]
         self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
-        self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
+        self.falling_piece_shape = self.piece_types[np.random.randint(0, len(self.piece_types))]
         self.subframe = 0
         self.subframes = 5
         self.screen = None
@@ -36,7 +28,7 @@ class Ris:
         board = np.zeros((self.height, self.width))
         self.board = np.array(board)
         self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
-        self.falling_piece_shape = piece_types[np.random.randint(0, len(piece_types))]
+        self.falling_piece_shape = self.piece_types[np.random.randint(0, len(self.piece_types))]
         self.subframe = 0
 
         piece = np.array(np.zeros((self.height, self.width)))
@@ -148,7 +140,7 @@ class Ris:
                 #self.falling_piece_shape = piece_types[0]
 
                 self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
-                self.falling_piece_shape = np.rot90(piece_types[np.random.randint(0, len(piece_types))], k=np.random.randint(0, 4))
+                self.falling_piece_shape = np.rot90(self.piece_types[np.random.randint(0, len(self.piece_types))], k=np.random.randint(0, 4))
 
             else:
                 self.falling_piece_pos = (self.falling_piece_pos[0], self.falling_piece_pos[1] + 1)
@@ -223,3 +215,50 @@ class Ris:
 
             if done: self.reset()
             clock.tick(int(framerate))
+
+        
+    piece_sets = {
+        'lettris' : [
+            [[0,0,0,0],
+            [0,0,0,0],
+            [0,1,1,0],
+            [0,0,0,0]]
+        ],
+
+        'classic' : [
+            [[0,0,0,0],
+            [0,0,1,0],
+            [1,1,1,0],
+            [0,0,0,0]], 
+            
+            [[0,0,0,0],
+            [0,1,0,0],
+            [0,1,1,1],
+            [0,0,0,0]],
+            
+            [[0,0,0,0],
+            [0,1,1,0],
+            [0,1,1,0],
+            [0,0,0,0]],
+
+            [[0,0,0,0],
+            [0,1,0,0],
+            [1,1,1,0],
+            [0,0,0,0]],
+
+            [[0,0,0,0],
+            [1,1,0,0],
+            [0,1,1,0],
+            [0,0,0,0]],
+
+            [[0,0,0,0],
+            [0,0,1,1],
+            [0,1,1,0],
+            [0,0,0,0]],
+
+            [[0,0,0,0],
+            [0,0,0,0],
+            [1,1,1,1],
+            [0,0,0,0]],
+        ]
+    }
