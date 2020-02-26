@@ -4,10 +4,10 @@ import gym
 from gym import spaces
 
 class Ris(gym.Env):
-    NOP, LEFT, RIGHT, DOWN, ROT = range(5)
+    NOP, LEFT, RIGHT, ROT = range(4)
 
     def __init__(self, scale, width=8, height=16, piece_set='lettris'):
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(4)
         board = np.zeros((height, width))
         self.width = width
         self.height = height
@@ -23,7 +23,8 @@ class Ris(gym.Env):
         self.subframe = 0
         self.subframes = 5
         self.screen = None
-    
+        self.incoming_garbage = 0
+
     def reset(self):
         board = np.zeros((self.height, self.width))
         self.board = np.array(board)
@@ -60,11 +61,25 @@ class Ris(gym.Env):
                     self.board[i - j] = self.board[i - j - 1]
         return removed
         
+    def apply_garbage(self, n_lines):
+        done = False
+        
+        if n_lines > 0:
+            if np.any(self.board[n_lines - 1]):
+                done = True
+            else:
+                self.board = np.roll(self.board, -n_lines, axis=0)
+                for i in range(n_lines):
+                    garbage_line = np.ones(self.width)
+                    garbage_line[np.random.randint(0, self.width)] = 0
+                    self.board[self.height - 1 - i] = garbage_line
+
     def step(self, action):
         self.time = self.time + 1
         self.subframe = self.subframe + 1
         done = False
         reward = 0
+        lines_cleared = 0
 
         if action == Ris.LEFT:
             coll = False
@@ -122,23 +137,18 @@ class Ris(gym.Env):
                             if pos[1] > (len(self.board) // 2):
                                 bottom = True
                 
-                #reward = 1
-                #if bottom:
-                #    reward = 1
-                #else:
-                #    reward = -.01
+                lines_cleared = self.resolve_lines()
                 
-                points = self.resolve_lines()
-                if points > 0:
-                    reward = (2 + points) ** 2
-                    
+                if lines_cleared > 0:
+                    reward = (2 + lines_cleared) ** 2
+                else:
+                    self.apply_garbage(self.incoming_garbage)
+                    self.incoming_garbage = 0
+
                 if self.falling_piece_pos[1] == 0:
                     done = True
                     reward = -10
                 
-                #self.falling_piece_pos = (np.random.randint(0, 2), 0)
-                #self.falling_piece_shape = piece_types[0]
-
                 self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
                 self.falling_piece_shape = np.rot90(self.piece_types[np.random.randint(0, len(self.piece_types))], k=np.random.randint(0, 4))
 
@@ -146,6 +156,7 @@ class Ris(gym.Env):
                 self.falling_piece_pos = (self.falling_piece_pos[0], self.falling_piece_pos[1] + 1)
 
         piece = np.array(np.zeros((self.height, self.width)))
+        
         for i in range(4):
             for j in range(4):
                 if self.falling_piece_shape[j][i] == 1:
@@ -153,6 +164,7 @@ class Ris(gym.Env):
                     piece[pos[1]][pos[0]] = 1
         
         timing_layer = np.zeros((self.height, self.width))
+        
         if self.subframe == self.subframes - 2:
             timing_layer = np.ones((self.height, self.width))
 
@@ -165,7 +177,7 @@ class Ris(gym.Env):
         if self.time > self.cutoff:
             done = True
 
-        return state, reward, done, {}
+        return state, reward, done, { 'lines_cleared' : lines_cleared }
     
 
     def draw(self, screen, heatmap=None):
@@ -216,7 +228,6 @@ class Ris(gym.Env):
             if done: self.reset()
             clock.tick(int(framerate))
 
-        
     piece_sets = {
         'lettris' : [
             [[0,0,0,0],
@@ -225,7 +236,7 @@ class Ris(gym.Env):
             [0,0,0,0]]
         ],
 
-        'classic' : [
+        'koktris' : [
             [[0,0,0,0],
             [0,0,1,0],
             [1,1,1,0],
