@@ -14,7 +14,7 @@ class Ris(gym.Env):
         self.time = 0
         self.cutoff = 4000
 
-        self.board = np.array(board)
+        self.board = np.array(board, dtype=int)
         self.size = len(board)
         self.cell_size = scale
         self.piece_types = Ris.piece_sets[piece_set]
@@ -27,7 +27,7 @@ class Ris(gym.Env):
 
     def reset(self):
         board = np.zeros((self.height, self.width))
-        self.board = np.array(board)
+        self.board = np.array(board, dtype=int)
         self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
         self.falling_piece_shape = self.piece_types[np.random.randint(0, len(self.piece_types))]
         self.subframe = 0
@@ -74,13 +74,13 @@ class Ris(gym.Env):
                     garbage_line[np.random.randint(0, self.width)] = 0
                     self.board[self.height - 1 - i] = garbage_line
 
-    def step(self, action):
+    def step_old(self, action):
         self.time = self.time + 1
         self.subframe = self.subframe + 1
         done = False
         reward = 0
         lines_cleared = 0
-
+    
         if action == Ris.LEFT:
             coll = False
             for i in range(4):
@@ -179,6 +179,114 @@ class Ris(gym.Env):
 
         return state, reward, done, { 'lines_cleared' : lines_cleared }
     
+    def step(self, action):
+        self.time = self.time + 1
+        self.subframe = self.subframe + 1
+        done = False
+        reward = 0
+        lines_cleared = 0
+        
+        dynamic_layer = np.array(np.zeros((self.height, self.width)), dtype=int)
+        lbound, rbound, ubound, dbound = (self.width, 0, self.height, 0)
+
+        for c in range(4):
+            for r in range(4):
+                if self.falling_piece_shape[r][c] == 1:
+                    pos = (c + self.falling_piece_pos[0], r + self.falling_piece_pos[1])
+                    dynamic_layer[pos[1]][pos[0]] = 1
+
+                    if pos[0] < lbound: lbound = pos[0]
+                    if pos[0] > rbound: rbound = pos[0]
+                    if pos[1] < ubound: ubound = pos[1]
+                    if pos[1] > dbound: dbound = pos[1]
+
+        if action == Ris.LEFT:
+            if lbound > 0:
+                preview_layer = np.roll(dynamic_layer, -1)
+                if not np.all(np.bitwise_xor(self.board, preview_layer)):
+                    self.falling_piece_pos = (self.falling_piece_pos[0] - 1, self.falling_piece_pos[1])
+        
+        if action == Ris.RIGHT:
+            if rbound < self.width - 1:
+                preview_layer = np.roll(dynamic_layer, 1)
+                if not np.all(np.bitwise_xor(self.board, preview_layer)):
+                    self.falling_piece_pos = (self.falling_piece_pos[0] + 1, self.falling_piece_pos[1])
+            
+        if action == Ris.ROT:
+            rotated = np.rot90(self.falling_piece_shape)
+            coll = False
+            for i in range(4):
+                for j in range(4):
+                    if not coll and rotated[j][i] == 1:
+                        pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
+                        if pos[0] not in range(0, len(self.board[0])) or \
+                           pos[1] not in range(0, len(self.board)) or \
+                           self.board[pos[1]][pos[0]] != 0:
+                            coll = True
+            if not coll:
+                self.falling_piece_shape = rotated
+
+        if self.subframe == self.subframes - 1:
+            self.subframe = 0
+            
+            coll = False
+            for i in range(4):
+                for j in range(4):
+                    if not coll and self.falling_piece_shape[j][i] == 1:
+                        pos_below = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1] + 1)
+                        if pos_below[1] >= len(self.board) or self.board[pos_below[1]][pos_below[0]] != 0:
+                            coll = True
+            if coll:
+                bottom = False
+                for i in range(4):
+                    for j in range(4):
+                        if self.falling_piece_shape[j][i] == 1:
+                            pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
+                            self.board[pos[1]][pos[0]] = 1
+                            if pos[1] > (len(self.board) // 2):
+                                bottom = True
+                
+                lines_cleared = self.resolve_lines()
+                
+                if lines_cleared > 0:
+                    reward = (2 + lines_cleared) ** 2
+                else:
+                    self.apply_garbage(self.incoming_garbage)
+                    self.incoming_garbage = 0
+
+                if self.falling_piece_pos[1] == 0:
+                    done = True
+                    reward = -10
+                
+                self.falling_piece_pos = (np.random.randint(0, self.width - 3), 0)
+                self.falling_piece_shape = np.rot90(self.piece_types[np.random.randint(0, len(self.piece_types))], k=np.random.randint(0, 4))
+
+            else:
+                self.falling_piece_pos = (self.falling_piece_pos[0], self.falling_piece_pos[1] + 1)
+
+        piece = np.array(np.zeros((self.height, self.width)))
+        
+        for i in range(4):
+            for j in range(4):
+                if self.falling_piece_shape[j][i] == 1:
+                    pos = (i + self.falling_piece_pos[0], j + self.falling_piece_pos[1])
+                    piece[pos[1]][pos[0]] = 1
+        
+        timing_layer = np.zeros((self.height, self.width))
+        
+        if self.subframe == self.subframes - 2:
+            timing_layer = np.ones((self.height, self.width))
+
+        state = np.array([[
+            self.board,
+            piece,
+            timing_layer
+        ]])
+
+        if self.time > self.cutoff:
+            done = True
+
+        return state, reward, done, { 'lines_cleared' : lines_cleared }
 
     def draw(self, screen, heatmap=None):
         
