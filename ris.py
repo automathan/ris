@@ -40,13 +40,11 @@ class Ris(gym.Env):
                     piece[pos[1]][pos[0]] = 1
         self.time = 0
 
-        
-        timing_layer = np.zeros((self.height, self.width))
-        
         state = np.array([[
             self.board,
             piece,
-            timing_layer
+            np.zeros((self.height, self.width)),
+            np.zeros((self.height, self.width))
         ]])
 
         return state
@@ -74,7 +72,7 @@ class Ris(gym.Env):
                     garbage_line[np.random.randint(0, self.width)] = 0
                     self.board[self.height - 1 - i] = garbage_line
 
-    def step_old(self, action):
+    def step(self, action):
         self.time = self.time + 1
         self.subframe = self.subframe + 1
         done = False
@@ -168,9 +166,14 @@ class Ris(gym.Env):
         if self.subframe == self.subframes - 2:
             timing_layer = np.ones((self.height, self.width))
 
+        garbage_layer = np.zeros((self.height, self.width))
+        for i in range(self.incoming_garbage):
+            garbage_layer[self.height - 1 - i] = np.ones(self.width)
+
         state = np.array([[
             self.board,
             piece,
+            garbage_layer,
             timing_layer
         ]])
 
@@ -179,7 +182,7 @@ class Ris(gym.Env):
 
         return state, reward, done, { 'lines_cleared' : lines_cleared }
     
-    def step(self, action):
+    def step_new(self, action):
         self.time = self.time + 1
         self.subframe = self.subframe + 1
         done = False
@@ -277,9 +280,14 @@ class Ris(gym.Env):
         if self.subframe == self.subframes - 2:
             timing_layer = np.ones((self.height, self.width))
 
+        garbage_layer = np.zeros((self.height, self.width))
+        for i in range(self.incoming_garbage):
+            garbage_layer[self.height - 1 - i] = np.ones(self.width)
+
         state = np.array([[
             self.board,
             piece,
+            garbage_layer,
             timing_layer
         ]])
 
@@ -381,3 +389,21 @@ class Ris(gym.Env):
             [0,0,0,0]],
         ]
     }
+
+
+if __name__ == "__main__":
+    cell_size = 24
+    
+    env = Ris(cell_size, 10, 20, piece_set='koktris')
+
+    screen = pg.display.set_mode((cell_size * (len(env.board[0])), cell_size * len(env.board)))
+
+    env.screen = screen
+    clock = pg.time.Clock()
+
+    while True:
+        _,_,done,_ = env.step(env.action_space.sample())
+        if done: env.reset()
+        env.render()
+        pg.display.flip()
+        #clock.tick(30)
