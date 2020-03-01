@@ -1,14 +1,22 @@
 # ris 🍚 
-An environment where you stack falling blocks. Not inspired by any existing games. Includes training setups for REINFORCE and DQN, as well as a collection of pretrained models of various skill levels. 
+An environment where you stack falling blocks.
 
 ## lettris
-The most simple configuration for the game, with only 1x2 rectangles and a 5x10 board.
+The most simple configuration for the game, with only 1x2 rectangles.
+```
+x x
+```
+
+## koktris
+The original piece set from the 1984 classic "Tetris".
+```
+  x     x x       x x   x x             x           x
+x x x     x x   x x     x x   x x x x   x x x   x x x
+```
 
 # Dependencies
 ```
-torch
-vicero
+gym
 pygame
 numpy
-matplotlib
 ```
