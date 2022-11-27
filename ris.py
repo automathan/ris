@@ -6,11 +6,12 @@ from gym import spaces
 class Ris(gym.Env):
     NOP, LEFT, RIGHT, ROT = range(4)
 
-    def __init__(self, scale, width=8, height=16, piece_set='lettris'):
+    def __init__(self, scale=16, width=10, height=20, piece_set='koktris'):
         self.action_space = spaces.Discrete(4)
         board = np.zeros((height, width))
         self.width = width
         self.height = height
+        self.observation_space = spaces.Box(low=0, high=1, shape=(4,self.height,self.width), dtype=np.uint8)
         self.time = 0
         self.cutoff = 4000
 
